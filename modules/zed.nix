@@ -7,7 +7,9 @@
 
 let
   cfg = config.zed;
+  userSettingsFile = pkgs.writeText "zed-user-settings.json" (builtins.toJSON cfg.settings);
   gitRoot = config.git.root;
+  stateFile = "${config.env.DEVENV_STATE}/zed-settings.json";
 
   taskType = lib.types.submodule {
     freeformType = lib.types.attrsOf lib.types.anything;
@@ -99,20 +101,6 @@ let
   };
 
   serializeTask = task: lib.filterAttrs (_: v: v != null) task;
-
-  # Merge user settings with nixd binary config
-  mergedSettings =
-    cfg.settings
-    // {
-      lsp = (cfg.settings.lsp or { }) // {
-        nixd = (cfg.settings.lsp.nixd or { }) // {
-          binary = {
-            path = "devenv";
-            arguments = [ "lsp" ];
-          };
-        };
-      };
-    };
 in
 {
   options.zed = {
@@ -121,13 +109,13 @@ in
     nixd.enable = lib.mkOption {
       type = lib.types.bool;
       default = true;
-      description = "Configure nixd LSP to run via `devenv lsp`. This makes devenv pass option and nixpkgs config directly to nixd via --config, which is more reliable than Zed's workspace/configuration mechanism.";
+      description = "Configure nixd LSP via `devenv lsp`. Sets the binary to `devenv lsp` and generates settings from `devenv lsp --print-config` so both --config and workspace/configuration provide valid option data.";
     };
 
     settings = lib.mkOption {
       type = lib.types.attrs;
       default = { };
-      description = "Settings for .zed/settings.json. When nixd is enabled, the nixd binary is automatically set to `devenv lsp`.";
+      description = "Settings for .zed/settings.json. When nixd is enabled, these are merged with nixd config and binary settings.";
     };
 
     tasks = lib.mkOption {
@@ -156,13 +144,32 @@ in
       (lib.mkIf (cfg.tasks != [ ]) {
         ".zed/tasks.json".json = map serializeTask cfg.tasks;
       })
-      (lib.mkIf cfg.nixd.enable {
-        ".zed/settings.json".json = mergedSettings;
-      })
       (lib.mkIf (!cfg.nixd.enable && cfg.settings != { }) {
         ".zed/settings.json".json = cfg.settings;
       })
       (lib.mapAttrs' (name: value: lib.nameValuePair ".zed/${name}" { json = value; }) cfg.extraFiles)
     ];
+
+    tasks = lib.mkIf cfg.nixd.enable {
+      "devenv:zed-settings" = {
+        exec = ''
+          mkdir -p ${gitRoot}/.zed
+          nixd_config=$(devenv lsp --print-config 2>/dev/null)
+          ${lib.getExe pkgs.jq} -s '
+            .[1] * {
+              lsp: {
+                nixd: {
+                  binary: { path: "devenv", arguments: ["lsp"] },
+                  settings: .[0].nixd
+                }
+              }
+            }
+          ' <(echo "$nixd_config") ${userSettingsFile} > ${stateFile}
+          ln -sf ${stateFile} ${gitRoot}/.zed/settings.json
+        '';
+        after = [ "devenv:files" ];
+        before = [ "devenv:enterShell" ];
+      };
+    };
   };
 }
