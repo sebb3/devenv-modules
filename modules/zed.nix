@@ -103,40 +103,54 @@ let
   serializeTask = task: lib.filterAttrs (_: v: v != null) task;
 in
 {
-  options.zed = {
-    enable = lib.mkEnableOption "Zed editor project configuration";
+  options.zed = lib.mkOption {
+    type = lib.types.submodule {
+      options = {
+        enable = lib.mkEnableOption "Zed editor project configuration";
 
-    nixd.enable = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = "Configure nixd LSP via `devenv lsp`. Sets the binary to `devenv lsp` and generates settings from `devenv lsp --print-config` so both --config and workspace/configuration provide valid option data.";
-    };
-
-    settings = lib.mkOption {
-      type = lib.types.attrs;
-      default = { };
-      description = "Settings for .zed/settings.json. When nixd is enabled, these are merged with nixd config and binary settings.";
-    };
-
-    tasks = lib.mkOption {
-      type = lib.types.listOf taskType;
-      default = [ ];
-      description = "Task definitions for .zed/tasks.json. Each entry is a Zed task object.";
-    };
-
-    extraFiles = lib.mkOption {
-      type = lib.types.attrsOf lib.types.anything;
-      default = { };
-      description = "Additional JSON files to create in .zed/. Keys are filenames, values are serialized to JSON.";
-      example = lib.literalExpression ''
-        {
-          "i18n.json" = {
-            localePaths = [ "packages/common-lang/src/sv" ];
-            sourceLocale = "sv";
+        nixd = lib.mkOption {
+          type = lib.types.submodule {
+            options = {
+              enable = lib.mkOption {
+                type = lib.types.bool;
+                default = true;
+                description = "Configure nixd LSP via `devenv lsp`. Sets the binary to `devenv lsp` and generates settings from `devenv lsp --print-config` so both --config and workspace/configuration provide valid option data.";
+              };
+            };
           };
-        }
-      '';
+          default = { };
+          description = "nixd LSP configuration.";
+        };
+
+        settings = lib.mkOption {
+          type = lib.types.attrs;
+          default = { };
+          description = "Settings for .zed/settings.json. When nixd is enabled, these are merged with nixd config and binary settings.";
+        };
+
+        tasks = lib.mkOption {
+          type = lib.types.listOf taskType;
+          default = [ ];
+          description = "Task definitions for .zed/tasks.json. Each entry is a Zed task object.";
+        };
+
+        extraFiles = lib.mkOption {
+          type = lib.types.attrsOf lib.types.anything;
+          default = { };
+          description = "Additional JSON files to create in .zed/. Keys are filenames, values are serialized to JSON.";
+          example = lib.literalExpression ''
+            {
+              "i18n.json" = {
+                localePaths = [ "packages/common-lang/src/sv" ];
+                sourceLocale = "sv";
+              };
+            }
+          '';
+        };
+      };
     };
+    default = { };
+    description = "Zed editor project configuration. Manages .zed/settings.json, tasks, and nixd LSP integration.";
   };
 
   config = lib.mkIf cfg.enable {
