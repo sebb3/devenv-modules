@@ -114,7 +114,7 @@ in
               enable = lib.mkOption {
                 type = lib.types.bool;
                 default = true;
-                description = "Auto-configure nixd LSP from devenv. When enabled, settings.json is generated at shell entry via `devenv lsp --print-config` and passed to nixd through Zed's workspace/configuration.";
+                description = "Configure nixd LSP via `devenv lsp`. Sets the binary to `devenv lsp` (which passes --config to nixd) and generates settings for workspace/configuration.";
               };
             };
           };
@@ -125,7 +125,7 @@ in
         settings = lib.mkOption {
           type = lib.types.attrs;
           default = { };
-          description = "Settings for .zed/settings.json. When nixd is enabled, these are merged with auto-discovered nixd config.";
+          description = "Settings for .zed/settings.json. When nixd is enabled, these are merged with nixd config and binary settings.";
         };
 
         tasks = lib.mkOption {
@@ -170,7 +170,14 @@ in
           mkdir -p ${gitRoot}/.zed
           nixd_config=$(devenv lsp --print-config 2>/dev/null)
           ${lib.getExe pkgs.jq} -s '
-            .[1] * { lsp: { nixd: { settings: .[0].nixd } } }
+            .[1] * {
+              lsp: {
+                nixd: {
+                  binary: { path: "devenv", arguments: ["lsp"] },
+                  settings: .[0].nixd
+                }
+              }
+            }
           ' <(echo "$nixd_config") ${userSettingsFile} > ${stateFile}
           ln -sf ${stateFile} ${gitRoot}/.zed/settings.json
         '';
