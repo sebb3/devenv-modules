@@ -168,7 +168,7 @@ in
       "devenv:zed-settings" = {
         exec = ''
           mkdir -p ${gitRoot}/.zed
-          nixd_config=$(devenv lsp --print-config 2>/dev/null)
+          nixd_config=$(devenv --quiet lsp --print-config)
           ${lib.getExe pkgs.jq} -s '
             .[1] * {
               lsp: {
